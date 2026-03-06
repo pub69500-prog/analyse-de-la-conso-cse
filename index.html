@@ -298,7 +298,7 @@ dos.forEach(d=>{const c=d["Catégorie"];if(!byCat[c])byCat[c]={n:0,od:0,cse:0,to
 dos.forEach(d=>{const p=String(d["Code court de la prestation"]).trim();if(!byPrest[p])byPrest[p]={n:0,od:0,cse:0,tot:0,pts:0,dos:[]};byPrest[p].n++;byPrest[p].od+=d["Part OD"];byPrest[p].cse+=d["Part CSE"];byPrest[p].tot+=d["Montant total"];byPrest[p].pts+=d["Points imputés au dossier"];byPrest[p].dos.push(d)});
 dos.forEach(d=>{const i=d["Catégorie d'imposition OD 2026"];if(!byImp[i])byImp[i]={n:0,od:0,cse:0,tot:0};byImp[i].n++;byImp[i].od+=d["Part OD"];byImp[i].cse+=d["Part CSE"];byImp[i].tot+=d["Montant total"]});
 
-const cols=['#f43f5e','#ec4899','#d946ef','#a855f7','#8b5cf6','#6366f1','#3b82f6','#06b6d4','#10b981','#f59e0b'];
+const cols=['#e63946','#f4a261','#2a9d8f','#264653','#9b5de5','#00bbf9','#fee440','#00f5d4','#f15bb5','#8ac926'];
 
 document.getElementById('f-cse').textContent=fmt(tCSE)+' €';
 document.getElementById('f-od').textContent=fmt(tOD)+' €';
