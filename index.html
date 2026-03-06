@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analyse Compteurs de Points</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#0a0e14;--bg2:#151b24;--card:#1a222d;--hover:#242d3a;--blue:#3b82f6;--cyan:#06b6d4;--green:#10b981;--amber:#f59e0b;--rose:#f43f5e;--violet:#8b5cf6;--txt:#f1f5f9;--txt2:#94a3b8;--muted:#64748b;--border:#2d3a4a}
+.light-mode{--bg:#f1f5f9;--bg2:#e2e8f0;--card:#fff;--hover:#f8fafc;--txt:#1e293b;--txt2:#475569;--muted:#64748b;--border:#cbd5e1}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--txt);line-height:1.6}
+.container{max-width:1500px;margin:0 auto;padding:1.5rem}
+header{text-align:center;padding:2rem;margin-bottom:2rem;background:linear-gradient(135deg,var(--bg2),var(--card));border-radius:16px;border:1px solid var(--border)}
+header h1{font-size:2rem;font-weight:700;background:linear-gradient(135deg,var(--cyan),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:.5rem}
+header p{color:var(--txt2)}
+.date-badge{display:inline-block;background:var(--blue);color:#fff;padding:.25rem .75rem;border-radius:20px;font-size:.8rem;margin-top:.75rem}
+.theme-toggle{position:fixed;top:1rem;right:1rem;z-index:1000;background:var(--card);padding:.5rem 1rem;border-radius:30px;border:1px solid var(--border);cursor:pointer;font-size:.85rem;color:var(--txt2)}
+.upload-zone{background:var(--card);border:2px dashed var(--border);border-radius:16px;padding:3rem;text-align:center;margin-bottom:2rem;transition:all .3s;cursor:pointer}
+.upload-zone:hover,.upload-zone.dragover{border-color:var(--blue);background:var(--hover)}
+.upload-icon{font-size:3rem;margin-bottom:1rem}
+.upload-title{font-size:1.2rem;font-weight:600;margin-bottom:.5rem}
+.upload-subtitle{color:var(--muted);font-size:.9rem;margin-bottom:1rem}
+.upload-input{display:none}
+.upload-btn{display:inline-block;background:var(--blue);color:#fff;padding:.75rem 1.5rem;border-radius:8px;font-weight:500;cursor:pointer}
+.upload-hint{margin-top:1rem;font-size:.75rem;color:var(--muted)}
+.upload-columns{margin-top:1.5rem;padding:1rem;background:var(--bg2);border-radius:8px;text-align:left}
+.upload-columns h4{font-size:.85rem;margin-bottom:.5rem;color:var(--txt2)}
+.upload-columns code{font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--cyan);background:var(--bg);padding:.15rem .4rem;border-radius:4px;margin:.15rem;display:inline-block}
+#dashboard{display:none}#dashboard.visible{display:block}
+.kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:1rem;margin-bottom:2rem}
+@media(max-width:1200px){.kpi-row{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:768px){.kpi-row{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:var(--card);border-radius:12px;padding:1.25rem;border:1px solid var(--border);border-top:3px solid var(--blue)}
+.kpi.rose{border-top-color:var(--rose)}.kpi.amber{border-top-color:var(--amber)}.kpi.emerald{border-top-color:var(--green)}.kpi.violet{border-top-color:var(--violet)}.kpi.cyan{border-top-color:var(--cyan)}
+.kpi-label{font-size:.75rem;color:var(--muted);text-transform:uppercase}
+.kpi-value{font-size:1.5rem;font-weight:700;font-family:'JetBrains Mono',monospace;margin:.25rem 0}
+.kpi-sub{font-size:.75rem;color:var(--txt2)}
+.tabs{display:flex;gap:.5rem;margin-bottom:1.5rem;background:var(--bg2);padding:.4rem;border-radius:10px;flex-wrap:wrap;border:1px solid var(--border)}
+.tab{padding:.6rem 1.2rem;background:transparent;border:none;color:var(--txt2);font-family:inherit;font-size:.85rem;font-weight:500;cursor:pointer;border-radius:6px}
+.tab:hover{background:var(--hover);color:var(--txt)}
+.tab.active{background:var(--blue);color:#fff}
+.section{display:none}.section.active{display:block}
+.section-title{font-size:1.3rem;font-weight:600;margin-bottom:1.5rem;padding-left:1rem;border-left:4px solid var(--blue)}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem}
+@media(max-width:1000px){.grid-2{grid-template-columns:1fr}}
+.card{background:var(--card);border-radius:12px;border:1px solid var(--border);overflow:hidden}
+.card-header{padding:1rem 1.25rem;background:var(--bg2);border-bottom:1px solid var(--border)}
+.card-title{font-weight:600;font-size:.95rem}
+.card-body{padding:1.25rem}
+.chart-with-data{display:flex;gap:1.5rem;align-items:flex-start}
+.chart-box{flex:0 0 240px;height:240px}
+.data-box{flex:1;max-height:280px;overflow-y:auto}
+@media(max-width:800px){.chart-with-data{flex-direction:column}.chart-box{width:100%;height:200px}}
+.data-row{display:flex;justify-content:space-between;align-items:center;padding:.65rem .9rem;background:var(--bg);border-radius:8px;margin-bottom:.4rem;border:1px solid var(--border)}
+.data-row-left{display:flex;align-items:center;gap:.6rem}
+.color-dot{width:10px;height:10px;border-radius:3px}
+.data-row-label{font-size:.85rem;font-weight:500}
+.data-row-right{text-align:right}
+.data-row-value{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:.9rem}
+.data-row-pct{font-size:.75rem;color:var(--muted)}
+.data-row-extra{font-size:.7rem;color:var(--txt2)}
+.fin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem;margin-bottom:1.5rem}
+@media(max-width:900px){.fin-grid{grid-template-columns:1fr}}
+.fin-card{background:var(--card);border-radius:12px;padding:1.5rem;border:1px solid var(--border)}
+.fin-title{font-size:.8rem;color:var(--muted);text-transform:uppercase;margin-bottom:.75rem}
+.fin-value{font-size:1.75rem;font-weight:700;font-family:'JetBrains Mono',monospace}
+.fin-value.cse{color:var(--rose)}.fin-value.od{color:var(--amber)}.fin-value.total{color:var(--blue)}
+.fin-bar{margin-top:1rem}.fin-bar-label{display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:.4rem}
+.fin-bar-track{height:6px;background:var(--bg2);border-radius:3px;overflow:hidden}
+.fin-bar-fill{height:100%;border-radius:3px}.fin-bar-fill.cse{background:var(--rose)}.fin-bar-fill.od{background:var(--amber)}
+.fin-details{margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)}
+.fin-row{display:flex;justify-content:space-between;padding:.3rem 0;font-size:.85rem}
+.fin-row-label{color:var(--txt2)}.fin-row-val{font-family:'JetBrains Mono',monospace;font-weight:500}
+.table-box{background:var(--card);border-radius:12px;border:1px solid var(--border);overflow:hidden;margin-bottom:1.5rem}
+.table-head{padding:.9rem 1.25rem;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.75rem}
+.table-title{font-weight:600;font-size:.95rem}
+.search-input{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:.5rem .9rem;color:var(--txt);font-family:inherit;font-size:.85rem;width:200px}
+.table-scroll{overflow-x:auto;max-height:500px;overflow-y:auto}
+table{width:100%;border-collapse:collapse}
+th,td{padding:.75rem 1rem;text-align:left;border-bottom:1px solid var(--border);font-size:.85rem}
+th{background:var(--bg2);color:var(--txt2);font-weight:600;font-size:.75rem;text-transform:uppercase;position:sticky;top:0;cursor:pointer;white-space:nowrap}
+th:hover{background:var(--hover);color:var(--blue)}
+th.sort-asc::after{content:' ▲';color:var(--blue);font-size:.65rem}
+th.sort-desc::after{content:' ▼';color:var(--blue);font-size:.65rem}
+tr:hover td{background:var(--hover)}
+.num{font-family:'JetBrains Mono',monospace;text-align:right}
+.badge{display:inline-block;padding:.15rem .5rem;border-radius:12px;font-size:.7rem;font-weight:500}
+.badge-blue{background:rgba(59,130,246,.15);color:var(--blue)}
+.badge-rose{background:rgba(244,63,94,.15);color:var(--rose)}
+.badge-amber{background:rgba(245,158,11,.15);color:var(--amber)}
+.badge-emerald{background:rgba(16,185,129,.15);color:var(--green)}
+.badge-violet{background:rgba(139,92,246,.15);color:var(--violet)}
+.positive{color:var(--green)}.negative{color:var(--rose)}
+.exp-row{cursor:pointer}.exp-row td:first-child{padding-left:2rem;position:relative}
+.exp-icon{position:absolute;left:.6rem;top:50%;transform:translateY(-50%);width:16px;height:16px;background:var(--blue);color:#fff;border-radius:3px;font-size:10px;display:flex;align-items:center;justify-content:center}
+.exp-row.open .exp-icon{background:var(--cyan);transform:translateY(-50%) rotate(90deg)}
+.detail-row{display:none}.detail-row.show{display:table-row}
+.detail-row td{background:var(--bg2);padding:0}
+.detail-content{padding:1rem;margin-left:1.5rem;border-left:3px solid var(--blue)}
+.dossier-box{background:var(--card);border-radius:8px;margin-bottom:.75rem;border:1px solid var(--border);overflow:hidden}
+.dossier-head{padding:.6rem .9rem;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:.5rem;font-size:.8rem}
+.dossier-title{font-weight:600}
+.member{display:flex;justify-content:space-between;padding:.4rem .9rem;border-bottom:1px solid var(--border);font-size:.8rem}
+.member:last-child{border:none}.member-name{flex:1}.member-name.main{font-weight:600;color:var(--cyan)}
+.member-vals{display:flex;gap:1rem;font-family:'JetBrains Mono',monospace;font-size:.75rem}
+.member-val{min-width:60px;text-align:right}.member-val.od{color:var(--amber)}.member-val.cse{color:var(--rose)}.member-val.pts{color:var(--violet)}
+.sort-info{font-size:.75rem;color:var(--muted);margin-bottom:.75rem}
+footer{text-align:center;padding:1.5rem;color:var(--muted);font-size:.8rem;margin-top:2rem;border-top:1px solid var(--border)}
+.reset-btn{position:fixed;bottom:1rem;right:1rem;z-index:1000;background:var(--rose);color:#fff;padding:.5rem 1rem;border-radius:8px;border:none;cursor:pointer;font-family:inherit;font-size:.85rem;display:none}
+.reset-btn.visible{display:block}
+select{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:.5rem .9rem;color:var(--txt);font-family:inherit;font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="theme-toggle" onclick="document.body.classList.toggle('light-mode')">🌓 Mode</div>
+<button class="reset-btn" id="resetBtn" onclick="resetDashboard()">🔄 Nouveau fichier</button>
+<div class="container">
+<header><h1>📊 Analyse des Compteurs de Points</h1><p>Extraction des prestations CSE/OD</p><span class="date-badge" id="currentDate"></span></header>
+<div class="upload-zone" id="uploadZone">
+<div class="upload-icon">📁</div>
+<div class="upload-title">Glissez votre fichier Excel ici</div>
+<div class="upload-subtitle">ou cliquez pour sélectionner</div>
+<input type="file" class="upload-input" id="fileInput" accept=".xls,.xlsx,.csv">
+<label for="fileInput" class="upload-btn">Parcourir...</label>
+<div class="upload-hint">Formats: .xls, .xlsx, .csv</div>
+<div class="upload-columns"><h4>📋 Colonnes attendues:</h4><div>
+<code>Numéro du dossier</code><code>Catégorie</code><code>Code court de la prestation</code><code>Nom bénéficiaire</code><code>Prénom bénéficiaire</code><code>Catégorie d'imposition OD 2026</code><code>Identité du participant</code><code>Date de début</code><code>Date de fin</code><code>Part OD</code><code>Part CSE</code><code>Montant total</code><code>Contrôle Points imputés au dossier</code>
+</div></div>
+</div>
+<div id="dashboard">
+<div class="kpi-row">
+<div class="kpi"><div class="kpi-label">Dossiers</div><div class="kpi-value" id="k-dos">-</div><div class="kpi-sub">familles</div></div>
+<div class="kpi emerald"><div class="kpi-label">Participants</div><div class="kpi-value" id="k-part">-</div><div class="kpi-sub">personnes</div></div>
+<div class="kpi amber"><div class="kpi-label">Part OD</div><div class="kpi-value" id="k-od">-</div><div class="kpi-sub">€</div></div>
+<div class="kpi rose"><div class="kpi-label">Part CSE</div><div class="kpi-value" id="k-cse">-</div><div class="kpi-sub">€</div></div>
+<div class="kpi violet"><div class="kpi-label">Total</div><div class="kpi-value" id="k-tot">-</div><div class="kpi-sub">€</div></div>
+<div class="kpi cyan"><div class="kpi-label">Points</div><div class="kpi-value" id="k-pts">-</div><div class="kpi-sub">imputés</div></div>
+</div>
+<div class="tabs">
+<button class="tab active" data-t="fin">💰 Financier</button>
+<button class="tab" data-t="cat">📁 Catégorie</button>
+<button class="tab" data-t="prest">🏨 Prestation</button>
+<button class="tab" data-t="imp">📊 Imposition</button>
+<button class="tab" data-t="data">📋 Données</button>
+<button class="tab" data-t="ctrl">⚠️ Contrôle</button>
+</div>
+<section id="fin" class="section active">
+<h2 class="section-title">Analyse Financière</h2>
+<div class="fin-grid">
+<div class="fin-card"><div class="fin-title">💼 Part CSE</div><div class="fin-value cse" id="f-cse">-</div><div class="fin-bar"><div class="fin-bar-label"><span>Contribution</span><span id="f-cse-p">-</span></div><div class="fin-bar-track"><div class="fin-bar-fill cse" id="f-cse-bar"></div></div></div><div class="fin-details"><div class="fin-row"><span class="fin-row-label">Moy/dossier</span><span class="fin-row-val" id="f-cse-d">-</span></div><div class="fin-row"><span class="fin-row-label">Moy/participant</span><span class="fin-row-val" id="f-cse-pp">-</span></div></div></div>
+<div class="fin-card"><div class="fin-title">🏢 Part OD</div><div class="fin-value od" id="f-od">-</div><div class="fin-bar"><div class="fin-bar-label"><span>Contribution</span><span id="f-od-p">-</span></div><div class="fin-bar-track"><div class="fin-bar-fill od" id="f-od-bar"></div></div></div><div class="fin-details"><div class="fin-row"><span class="fin-row-label">Moy/dossier</span><span class="fin-row-val" id="f-od-d">-</span></div><div class="fin-row"><span class="fin-row-label">Moy/participant</span><span class="fin-row-val" id="f-od-pp">-</span></div></div></div>
+<div class="fin-card"><div class="fin-title">📈 Total</div><div class="fin-value total" id="f-tot">-</div><div class="fin-details"><div class="fin-row"><span class="fin-row-label">Dossiers</span><span class="fin-row-val" id="f-ndos">-</span></div><div class="fin-row"><span class="fin-row-label">Participants</span><span class="fin-row-val" id="f-npart">-</span></div><div class="fin-row"><span class="fin-row-label">Moy/dossier</span><span class="fin-row-val" id="f-tot-d">-</span></div><div class="fin-row"><span class="fin-row-label">Moy/pers</span><span class="fin-row-val" id="f-tot-pp">-</span></div></div></div>
+</div>
+<div class="grid-2">
+<div class="card"><div class="card-header"><div class="card-title">CSE par Catégorie</div></div><div class="card-body"><div class="chart-with-data"><div class="chart-box"><canvas id="ch-fin-cat"></canvas></div><div class="data-box" id="dl-fin-cat"></div></div></div></div>
+<div class="card"><div class="card-header"><div class="card-title">CSE par Imposition</div></div><div class="card-body"><div class="chart-with-data"><div class="chart-box"><canvas id="ch-fin-imp"></canvas></div><div class="data-box" id="dl-fin-imp"></div></div></div></div>
+</div>
+<div class="card"><div class="card-header"><div class="card-title">Top 10 Prestations CSE</div></div><div class="card-body"><div class="chart-with-data"><div class="chart-box" style="flex:0 0 300px;height:280px"><canvas id="ch-fin-top"></canvas></div><div class="data-box" id="dl-fin-top"></div></div></div></div>
+</section>
+<section id="cat" class="section">
+<h2 class="section-title">Par Catégorie</h2>
+<div class="grid-2">
+<div class="card"><div class="card-header"><div class="card-title">Part CSE</div></div><div class="card-body"><div class="chart-with-data"><div class="chart-box"><canvas id="ch-cat"></canvas></div><div class="data-box" id="dl-cat"></div></div></div></div>
+<div class="card"><div class="card-header"><div class="card-title">Stats</div></div><div class="card-body"><div class="data-box" id="dl-cat-stats"></div></div></div>
+</div>
+<div class="sort-info">💡 Cliquez sur les en-têtes pour trier</div>
+<div class="table-box"><div class="table-head"><span class="table-title">Par Catégorie</span></div><div class="table-scroll"><table id="tbl-cat"><thead><tr><th data-col="cat" data-type="str">Catégorie</th><th data-col="n" data-type="num" class="num">Dos.</th><th data-col="np" data-type="num" class="num">Part.</th><th data-col="od" data-type="num" class="num">OD</th><th data-col="cse" data-type="num" class="num">CSE</th><th data-col="tot" data-type="num" class="num">Total</th><th data-col="moy" data-type="num" class="num">Moy</th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div>
+</section>
+<section id="prest" class="section">
+<h2 class="section-title">Par Prestation</h2>
+<div class="grid-2">
+<div class="card"><div class="card-header"><div class="card-title">Top 10 CSE</div></div><div class="card-body"><div class="chart-with-data"><div class="chart-box"><canvas id="ch-prest"></canvas></div><div class="data-box" id="dl-prest"></div></div></div></div>
+<div class="card"><div class="card-header"><div class="card-title">Points</div></div><div class="card-body"><div class="data-box" id="dl-prest-pts"></div></div></div>
+</div>
+<div class="sort-info">💡 Cliquez sur une ligne pour voir les détails</div>
+<div class="table-box"><div class="table-head"><span class="table-title">Prestations</span><input class="search-input" id="src-prest" placeholder="🔍 Rechercher..."></div><div class="table-scroll"><table id="tbl-prest"><thead><tr><th data-col="prest" data-type="str">Prestation</th><th data-col="n" data-type="num" class="num">Dos.</th><th data-col="od" data-type="num" class="num">OD</th><th data-col="cse" data-type="num" class="num">CSE</th><th data-col="tot" data-type="num" class="num">Total</th><th data-col="pts" data-type="num" class="num">Pts</th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div>
+</section>
+<section id="imp" class="section">
+<h2 class="section-title">Par Imposition</h2>
+<div class="grid-2">
+<div class="card"><div class="card-header"><div class="card-title">Part CSE</div></div><div class="card-body"><div class="chart-with-data"><div class="chart-box"><canvas id="ch-imp"></canvas></div><div class="data-box" id="dl-imp"></div></div></div></div>
+<div class="card"><div class="card-header"><div class="card-title">Ratio</div></div><div class="card-body"><div class="data-box" id="dl-imp-ratio"></div></div></div>
+</div>
+<div class="table-box"><div class="table-head"><span class="table-title">Par Imposition</span></div><div class="table-scroll"><table id="tbl-imp"><thead><tr><th data-col="imp" data-type="num">Cat.</th><th data-col="n" data-type="num" class="num">Dos.</th><th data-col="od" data-type="num" class="num">OD</th><th data-col="cse" data-type="num" class="num">CSE</th><th data-col="tot" data-type="num" class="num">Total</th><th data-col="pctOD" data-type="num" class="num">%OD</th><th data-col="pctCSE" data-type="num" class="num">%CSE</th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div>
+</section>
+<section id="data" class="section">
+<h2 class="section-title">Données</h2>
+<div style="display:flex;gap:1rem;margin-bottom:1rem;flex-wrap:wrap">
+<select id="flt-cat"><option value="">Toutes catégories</option></select>
+<select id="flt-prest"><option value="">Toutes prestations</option></select>
+<select id="flt-imp"><option value="">Toutes impositions</option></select>
+</div>
+<div class="table-box"><div class="table-head"><span class="table-title">Dossiers (<span id="cnt-dos">0</span>)</span><input class="search-input" id="src-dos" placeholder="🔍 Bénéficiaire..."></div><div class="table-scroll"><table id="tbl-dos"><thead><tr><th data-col="num" data-type="num">N°</th><th data-col="nom" data-type="str">Bénéf.</th><th data-col="cat" data-type="str">Cat.</th><th data-col="prest" data-type="str">Prest.</th><th data-col="imp" data-type="num">Imp.</th><th data-col="date" data-type="str">Dates</th><th data-col="od" data-type="num" class="num">OD</th><th data-col="cse" data-type="num" class="num">CSE</th><th data-col="tot" data-type="num" class="num">Tot.</th><th data-col="pts" data-type="num" class="num">Pts</th></tr></thead><tbody></tbody></table></div></div>
+</section>
+<section id="ctrl" class="section">
+<h2 class="section-title">Contrôle Points</h2>
+<div class="kpi-row" style="grid-template-columns:repeat(3,1fr);margin-bottom:1.5rem">
+<div class="kpi"><div class="kpi-label">Avec écart</div><div class="kpi-value" id="k-ecart">-</div><div class="kpi-sub">dossiers</div></div>
+<div class="kpi rose"><div class="kpi-label">Écart total</div><div class="kpi-value" id="k-ecart-tot">-</div><div class="kpi-sub">points</div></div>
+<div class="kpi emerald"><div class="kpi-label">Conformes</div><div class="kpi-value" id="k-conf">-</div><div class="kpi-sub">OK</div></div>
+</div>
+<div class="table-box"><div class="table-head"><span class="table-title">Écarts</span></div><div class="table-scroll"><table id="tbl-ctrl"><thead><tr><th data-col="num" data-type="num">N°</th><th data-col="nom" data-type="str">Bénéf.</th><th data-col="prest" data-type="str">Prest.</th><th data-col="imp" data-type="num" class="num">Imp.</th><th data-col="ctrl" data-type="num" class="num">Ctrl</th><th data-col="ecart" data-type="num" class="num">Écart</th><th data-col="statut" data-type="str">Statut</th></tr></thead><tbody></tbody></table></div></div>
+</section>
+<footer>Généré automatiquement • <span id="footerDate"></span></footer>
+</div>
+</div>
+<script>
+const today=new Date(),dateStr=today.toLocaleDateString('fr-FR');
+document.getElementById('currentDate').textContent=dateStr;
+document.getElementById('footerDate').textContent=dateStr;
+let raw=[],charts=[];
+const uploadZone=document.getElementById('uploadZone'),fileInput=document.getElementById('fileInput');
+
+uploadZone.onclick=e=>{if(!e.target.classList.contains('upload-btn')&&e.target!==fileInput)fileInput.click()};
+uploadZone.ondragover=e=>{e.preventDefault();uploadZone.classList.add('dragover')};
+uploadZone.ondragleave=()=>uploadZone.classList.remove('dragover');
+uploadZone.ondrop=e=>{e.preventDefault();uploadZone.classList.remove('dragover');if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0])};
+fileInput.onchange=e=>{if(e.target.files[0])handleFile(e.target.files[0])};
+
+function handleFile(f){
+if(!/\.(xls|xlsx|csv)$/i.test(f.name)){alert('Format non supporté');return}
+const r=new FileReader();
+r.onload=e=>{
+try{
+const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});
+const json=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{raw:false,defval:''});
+if(!json.length){alert('Fichier vide');return}
+raw=normalize(json);
+if(!raw.length){alert('Aucune donnée valide');return}
+uploadZone.style.display='none';
+document.getElementById('dashboard').classList.add('visible');
+document.getElementById('resetBtn').classList.add('visible');
+initDashboard();
+}catch(err){alert('Erreur: '+err.message)}
+};r.readAsArrayBuffer(f);
+}
+
+function pNum(v){if(v==null||v==='')return 0;if(typeof v==='number')return v;return parseFloat(String(v).replace(/\s/g,'').replace(/€/g,'').replace(/[^\d,.\-]/g,'').replace(',','.'))||0}
+function fDate(v){if(!v)return'-';if(v instanceof Date)return v.toLocaleDateString('fr-FR');const s=String(v).trim();if(/^\d{4}-\d{2}-\d{2}/.test(s))return new Date(s).toLocaleDateString('fr-FR');return s||'-'}
+
+function normalize(json){
+console.log('Colonnes:',Object.keys(json[0]||{}));
+return json.map(r=>({
+"Numéro du dossier":pNum(r["Numéro du dossier"])||0,
+"Catégorie":r["Catégorie"]||'Non définie',
+"Code court de la prestation":r["Code court de la prestation"]||'N/A',
+"Nom bénéficiaire":r["Nom bénéficiaire"]||'',
+"Prénom bénéficiaire":r["Prénom bénéficiaire"]||'',
+"Catégorie d'imposition OD 2026":pNum(r["Catégorie d'imposition OD 2026"])||1,
+"Identité du participant":r["Identité du participant"]||(r["Nom bénéficiaire"]+' '+r["Prénom bénéficiaire"]).trim(),
+"Date de début":fDate(r["Date de début"]),
+"Date de fin":fDate(r["Date de fin"]),
+"Part OD":pNum(r["Part OD"])||0,
+"Part CSE":pNum(r["Part CSE"])||0,
+"Montant total":pNum(r["Part OD"])+pNum(r["Part CSE"]),
+"Points imputés au dossier":pNum(r["Part CSE"]),
+"Contrôle Évaluation points":pNum(r["Contrôle Évaluation points"])||pNum(r["Contrôle Points imputés au dossier"]||r["Points imputés au dossier"])||0
+})).filter(r=>r["Numéro du dossier"]>0);
+}
+
+function resetDashboard(){
+charts.forEach(c=>c.destroy());charts=[];raw=[];
+document.getElementById('dashboard').classList.remove('visible');
+document.getElementById('resetBtn').classList.remove('visible');
+uploadZone.style.display='block';fileInput.value='';
+document.querySelectorAll('tbody,tfoot').forEach(t=>t.innerHTML='');
+document.querySelectorAll('[id^="dl-"]').forEach(e=>e.innerHTML='');
+['flt-cat','flt-prest','flt-imp'].forEach(id=>document.getElementById(id).innerHTML='<option value="">Tous</option>');
+}
+
+function initDashboard(){
+charts.forEach(c=>c.destroy());charts=[];
+const dMap=new Map();
+raw.forEach(r=>{const k=r["Numéro du dossier"];if(!dMap.has(k))dMap.set(k,{...r,parts:[r],np:1});else{const e=dMap.get(k);e.parts.push(r);e.np++;e["Part OD"]+=r["Part OD"];e["Part CSE"]+=r["Part CSE"];e["Montant total"]+=r["Montant total"]}});
+const dos=Array.from(dMap.values());
+const tOD=dos.reduce((s,d)=>s+d["Part OD"],0);
+const tCSE=dos.reduce((s,d)=>s+d["Part CSE"],0);
+const tMont=dos.reduce((s,d)=>s+d["Montant total"],0);
+const tPts=dos.reduce((s,d)=>s+d["Points imputés au dossier"],0);
+const tPart=raw.length;
+const fmt=n=>new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2}).format(n);
+const fK=n=>n>=1000?(n/1000).toFixed(1)+'K':fmt(n);
+
+document.getElementById('k-dos').textContent=dos.length;
+document.getElementById('k-part').textContent=tPart;
+document.getElementById('k-od').textContent=fK(tOD);
+document.getElementById('k-cse').textContent=fK(tCSE);
+document.getElementById('k-tot').textContent=fK(tMont);
+document.getElementById('k-pts').textContent=fK(tPts);
+
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));t.classList.add('active');document.getElementById(t.dataset.t).classList.add('active')});
+
+const byCat={},byPrest={},byImp={};
+dos.forEach(d=>{const c=d["Catégorie"];if(!byCat[c])byCat[c]={n:0,od:0,cse:0,tot:0,np:0,pts:0};byCat[c].n++;byCat[c].od+=d["Part OD"];byCat[c].cse+=d["Part CSE"];byCat[c].tot+=d["Montant total"];byCat[c].np+=d.np;byCat[c].pts+=d["Points imputés au dossier"]});
+dos.forEach(d=>{const p=String(d["Code court de la prestation"]).trim();if(!byPrest[p])byPrest[p]={n:0,od:0,cse:0,tot:0,pts:0,dos:[]};byPrest[p].n++;byPrest[p].od+=d["Part OD"];byPrest[p].cse+=d["Part CSE"];byPrest[p].tot+=d["Montant total"];byPrest[p].pts+=d["Points imputés au dossier"];byPrest[p].dos.push(d)});
+dos.forEach(d=>{const i=d["Catégorie d'imposition OD 2026"];if(!byImp[i])byImp[i]={n:0,od:0,cse:0,tot:0};byImp[i].n++;byImp[i].od+=d["Part OD"];byImp[i].cse+=d["Part CSE"];byImp[i].tot+=d["Montant total"]});
+
+const cols=['#f43f5e','#ec4899','#d946ef','#a855f7','#8b5cf6','#6366f1','#3b82f6','#06b6d4','#10b981','#f59e0b'];
+
+document.getElementById('f-cse').textContent=fmt(tCSE)+' €';
+document.getElementById('f-od').textContent=fmt(tOD)+' €';
+document.getElementById('f-tot').textContent=fmt(tMont)+' €';
+const pCSE=tMont>0?(tCSE/tMont*100):0,pOD=tMont>0?(tOD/tMont*100):0;
+document.getElementById('f-cse-p').textContent=pCSE.toFixed(1)+'%';
+document.getElementById('f-od-p').textContent=pOD.toFixed(1)+'%';
+document.getElementById('f-cse-bar').style.width=pCSE+'%';
+document.getElementById('f-od-bar').style.width=pOD+'%';
+document.getElementById('f-cse-d').textContent=fmt(dos.length>0?tCSE/dos.length:0)+' €';
+document.getElementById('f-od-d').textContent=fmt(dos.length>0?tOD/dos.length:0)+' €';
+document.getElementById('f-cse-pp').textContent=fmt(tPart>0?tCSE/tPart:0)+' €';
+document.getElementById('f-od-pp').textContent=fmt(tPart>0?tOD/tPart:0)+' €';
+document.getElementById('f-ndos').textContent=dos.length;
+document.getElementById('f-npart').textContent=tPart;
+document.getElementById('f-tot-d').textContent=fmt(dos.length>0?tMont/dos.length:0)+' €';
+document.getElementById('f-tot-pp').textContent=fmt(tPart>0?tMont/tPart:0)+' €';
+
+function mkChart(canvasId,listId,obj,key,prefix=''){
+const ent=Object.entries(obj).sort((a,b)=>b[1][key]-a[1][key]);
+const tot=ent.reduce((s,e)=>s+e[1][key],0);
+const ctx=document.getElementById(canvasId);
+if(ctx){const ch=new Chart(ctx,{type:'doughnut',data:{labels:ent.map(e=>prefix+e[0]),datasets:[{data:ent.map(e=>e[1][key]),backgroundColor:cols.slice(0,ent.length),borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}});charts.push(ch)}
+const el=document.getElementById(listId);
+if(el)el.innerHTML=ent.map((e,i)=>{const p=tot>0?(e[1][key]/tot*100).toFixed(1):'0';return '<div class="data-row"><div class="data-row-left"><div class="color-dot" style="background:'+cols[i%10]+'"></div><div class="data-row-label">'+prefix+e[0]+'</div></div><div class="data-row-right"><div class="data-row-value">'+fmt(e[1][key])+' €</div><div class="data-row-pct">'+p+'%</div>'+(e[1].n?'<div class="data-row-extra">'+e[1].n+' dos</div>':'')+'</div></div>'}).join('');
+}
+
+mkChart('ch-fin-cat','dl-fin-cat',byCat,'cse');
+mkChart('ch-fin-imp','dl-fin-imp',byImp,'cse','Cat ');
+mkChart('ch-cat','dl-cat',byCat,'cse');
+mkChart('ch-prest','dl-prest',byPrest,'cse');
+mkChart('ch-imp','dl-imp',byImp,'cse','Cat ');
+
+document.getElementById('dl-cat-stats').innerHTML=Object.entries(byCat).sort((a,b)=>b[1].cse-a[1].cse).map((e,i)=>'<div class="data-row"><div class="data-row-left"><div class="color-dot" style="background:'+cols[i%10]+'"></div><div class="data-row-label">'+e[0]+'</div></div><div class="data-row-right"><div class="data-row-value">'+e[1].n+' dos / '+e[1].np+' pers</div><div class="data-row-pct">Moy: '+fmt(e[1].tot/e[1].n)+' €</div></div></div>').join('');
+document.getElementById('dl-prest-pts').innerHTML=Object.entries(byPrest).sort((a,b)=>a[1].pts-b[1].pts).slice(0,10).map((p,i)=>'<div class="data-row"><div class="data-row-left"><span class="badge badge-violet">'+p[0]+'</span></div><div class="data-row-right"><div class="data-row-value">'+fmt(p[1].pts)+' pts</div><div class="data-row-extra">'+p[1].n+' dos</div></div></div>').join('');
+document.getElementById('dl-imp-ratio').innerHTML=Object.entries(byImp).sort((a,b)=>a[0]-b[0]).map(e=>{const pO=e[1].tot>0?(e[1].od/e[1].tot*100).toFixed(0):'0',pC=e[1].tot>0?(e[1].cse/e[1].tot*100).toFixed(0):'0';return '<div class="data-row"><div class="data-row-left"><span class="badge badge-amber">Cat '+e[0]+'</span></div><div class="data-row-right"><div class="data-row-value">'+pO+'% OD / '+pC+'% CSE</div><div class="data-row-extra">'+e[1].n+' dos</div></div></div>'}).join('');
+
+const top10=Object.entries(byPrest).sort((a,b)=>b[1].cse-a[1].cse).slice(0,10);
+const ctx10=document.getElementById('ch-fin-top');
+if(ctx10){const ch=new Chart(ctx10,{type:'bar',data:{labels:top10.map(p=>p[0]),datasets:[{data:top10.map(p=>p[1].cse),backgroundColor:'#f43f5e',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{color:'#2d3a4a'},ticks:{color:'#94a3b8'}},y:{grid:{display:false},ticks:{color:'#94a3b8',font:{size:10}}}}}});charts.push(ch)}
+document.getElementById('dl-fin-top').innerHTML=top10.map((p,i)=>{const pct=tCSE>0?(p[1].cse/tCSE*100).toFixed(1):'0';return '<div class="data-row"><div class="data-row-left"><div class="color-dot" style="background:'+cols[i%10]+'"></div><div class="data-row-label">'+p[0]+'</div></div><div class="data-row-right"><div class="data-row-value">'+fmt(p[1].cse)+' €</div><div class="data-row-pct">'+pct+'%</div><div class="data-row-extra">'+p[1].n+' dos</div></div></div>'}).join('');
+
+let catData=Object.entries(byCat).map(([c,d])=>({cat:c,n:d.n,np:d.np,od:d.od,cse:d.cse,tot:d.tot,moy:d.tot/d.n}));
+let prestData=Object.entries(byPrest).map(([p,d])=>({prest:p,n:d.n,od:d.od,cse:d.cse,tot:d.tot,pts:d.pts,dos:d.dos}));
+let impData=Object.entries(byImp).map(([i,d])=>({imp:parseInt(i),n:d.n,od:d.od,cse:d.cse,tot:d.tot,pctOD:d.tot>0?d.od/d.tot*100:0,pctCSE:d.tot>0?d.cse/d.tot*100:0}));
+let ctrlData=dos.filter(d=>Math.abs(d["Points imputés au dossier"]-d["Contrôle Évaluation points"])>0.01&&d["Contrôle Évaluation points"]>0).map(d=>({num:d["Numéro du dossier"],nom:d["Nom bénéficiaire"]+' '+d["Prénom bénéficiaire"],prest:String(d["Code court de la prestation"]).trim(),imp:d["Points imputés au dossier"],ctrl:d["Contrôle Évaluation points"],ecart:d["Points imputés au dossier"]-d["Contrôle Évaluation points"],statut:d["Points imputés au dossier"]>d["Contrôle Évaluation points"]?'Excédent':'Déficit'}));
+
+function sortTbl(id,data,col,type,fn){const th=document.querySelector('#'+id+' th[data-col="'+col+'"]');document.querySelectorAll('#'+id+' th').forEach(t=>t.classList.remove('sort-asc','sort-desc'));const dir=th.classList.contains('sort-asc')?'desc':'asc';th.classList.add('sort-'+dir);data.sort((a,b)=>{let vA=a[col],vB=b[col];if(type==='num'){vA=parseFloat(vA)||0;vB=parseFloat(vB)||0;return dir==='asc'?vA-vB:vB-vA}return dir==='asc'?String(vA||'').localeCompare(String(vB||'')):String(vB||'').localeCompare(String(vA||''))});fn(data)}
+
+function renderCat(d){document.querySelector('#tbl-cat tbody').innerHTML=d.map(x=>'<tr><td>'+x.cat+'</td><td class="num">'+x.n+'</td><td class="num">'+x.np+'</td><td class="num">'+fmt(x.od)+'</td><td class="num">'+fmt(x.cse)+'</td><td class="num">'+fmt(x.tot)+'</td><td class="num">'+fmt(x.moy)+'</td></tr>').join('');document.querySelector('#tbl-cat tfoot').innerHTML='<tr style="font-weight:600;background:var(--bg2)"><td>TOTAL</td><td class="num">'+dos.length+'</td><td class="num">'+tPart+'</td><td class="num">'+fmt(tOD)+'</td><td class="num">'+fmt(tCSE)+'</td><td class="num">'+fmt(tMont)+'</td><td class="num">'+fmt(tMont/dos.length)+'</td></tr>'}
+renderCat(catData);document.querySelectorAll('#tbl-cat th[data-col]').forEach(th=>th.onclick=()=>sortTbl('tbl-cat',catData,th.dataset.col,th.dataset.type,renderCat));
+
+function renderPrest(d){let h='',tP=0;d.forEach((x,i)=>{tP+=x.pts;h+='<tr class="exp-row" data-i="'+i+'"><td><span class="exp-icon">▶</span><span class="badge badge-blue">'+x.prest+'</span></td><td class="num">'+x.n+'</td><td class="num">'+fmt(x.od)+'</td><td class="num">'+fmt(x.cse)+'</td><td class="num">'+fmt(x.tot)+'</td><td class="num">'+fmt(x.pts)+'</td></tr><tr class="detail-row" data-di="'+i+'"><td colspan="6"><div class="detail-content">'+x.dos.map(dd=>'<div class="dossier-box"><div class="dossier-head"><div class="dossier-title">📁 '+dd["Numéro du dossier"]+' - '+dd["Nom bénéficiaire"]+' '+dd["Prénom bénéficiaire"]+'</div><div><span class="badge badge-emerald">'+dd["Catégorie"]+'</span> <span class="badge badge-amber">Cat.'+dd["Catégorie d'imposition OD 2026"]+'</span></div></div>'+dd.parts.map(pp=>'<div class="member"><div class="member-name '+(pp["Part OD"]>0||pp["Part CSE"]>0?'main':'')+'">'+pp["Identité du participant"]+'</div><div class="member-vals"><div class="member-val od">'+fmt(pp["Part OD"])+' €</div><div class="member-val cse">'+fmt(pp["Part CSE"])+' €</div><div class="member-val pts">'+fmt(pp["Points imputés au dossier"])+' pts</div></div></div>').join('')+'</div>').join('')+'</div></td></tr>'});document.querySelector('#tbl-prest tbody').innerHTML=h;document.querySelector('#tbl-prest tfoot').innerHTML='<tr style="font-weight:600;background:var(--bg2)"><td>TOTAL</td><td class="num">'+dos.length+'</td><td class="num">'+fmt(tOD)+'</td><td class="num">'+fmt(tCSE)+'</td><td class="num">'+fmt(tMont)+'</td><td class="num">'+fmt(tP)+'</td></tr>';document.querySelectorAll('.exp-row').forEach(r=>r.onclick=e=>{if(e.target.closest('th'))return;r.classList.toggle('open');document.querySelector('tr[data-di="'+r.dataset.i+'"]').classList.toggle('show')})}
+prestData.sort((a,b)=>a.pts-b.pts);renderPrest(prestData);document.querySelectorAll('#tbl-prest th[data-col]').forEach(th=>th.onclick=()=>sortTbl('tbl-prest',prestData,th.dataset.col,th.dataset.type,renderPrest));
+document.getElementById('src-prest').oninput=e=>{const s=e.target.value.toLowerCase();document.querySelectorAll('#tbl-prest tbody .exp-row').forEach(r=>{const m=r.textContent.toLowerCase().includes(s);r.style.display=m?'':'none';const d=document.querySelector('tr[data-di="'+r.dataset.i+'"]');if(d){d.style.display=m?'':'none';if(!m)d.classList.remove('show')}})};
+
+function renderImp(d){document.querySelector('#tbl-imp tbody').innerHTML=d.map(x=>'<tr><td><span class="badge badge-emerald">Cat '+x.imp+'</span></td><td class="num">'+x.n+'</td><td class="num">'+fmt(x.od)+'</td><td class="num">'+fmt(x.cse)+'</td><td class="num">'+fmt(x.tot)+'</td><td class="num">'+x.pctOD.toFixed(1)+'%</td><td class="num">'+x.pctCSE.toFixed(1)+'%</td></tr>').join('');document.querySelector('#tbl-imp tfoot').innerHTML='<tr style="font-weight:600;background:var(--bg2)"><td>TOTAL</td><td class="num">'+dos.length+'</td><td class="num">'+fmt(tOD)+'</td><td class="num">'+fmt(tCSE)+'</td><td class="num">'+fmt(tMont)+'</td><td class="num">'+(tOD/tMont*100).toFixed(1)+'%</td><td class="num">'+(tCSE/tMont*100).toFixed(1)+'%</td></tr>'}
+renderImp(impData);document.querySelectorAll('#tbl-imp th[data-col]').forEach(th=>th.onclick=()=>sortTbl('tbl-imp',impData,th.dataset.col,th.dataset.type,renderImp));
+
+[...new Set(dos.map(d=>d["Catégorie"]))].sort().forEach(c=>document.getElementById('flt-cat').innerHTML+='<option value="'+c+'">'+c+'</option>');
+[...new Set(dos.map(d=>d["Code court de la prestation"]))].sort().forEach(p=>document.getElementById('flt-prest').innerHTML+='<option value="'+p+'">'+String(p).trim()+'</option>');
+[...new Set(dos.map(d=>d["Catégorie d'imposition OD 2026"]))].sort((a,b)=>a-b).forEach(i=>document.getElementById('flt-imp').innerHTML+='<option value="'+i+'">Cat '+i+'</option>');
+
+let filteredDos=[...dos];
+function renderDos(d){document.getElementById('cnt-dos').textContent=d.length;document.querySelector('#tbl-dos tbody').innerHTML=d.map(x=>'<tr><td>'+x["Numéro du dossier"]+'</td><td><strong>'+x["Nom bénéficiaire"]+'</strong> '+x["Prénom bénéficiaire"]+'</td><td style="font-size:.75rem">'+x["Catégorie"]+'</td><td><span class="badge badge-blue">'+String(x["Code court de la prestation"]).trim()+'</span></td><td><span class="badge badge-amber">'+x["Catégorie d'imposition OD 2026"]+'</span></td><td style="font-size:.75rem">'+x["Date de début"]+' → '+x["Date de fin"]+'</td><td class="num">'+fmt(x["Part OD"])+'</td><td class="num">'+fmt(x["Part CSE"])+'</td><td class="num"><strong>'+fmt(x["Montant total"])+'</strong></td><td class="num">'+fmt(x["Points imputés au dossier"])+'</td></tr>').join('')}
+function filterDos(){let f=[...dos];const c=document.getElementById('flt-cat').value,p=document.getElementById('flt-prest').value,i=document.getElementById('flt-imp').value,s=document.getElementById('src-dos').value.toLowerCase();if(c)f=f.filter(d=>d["Catégorie"]===c);if(p)f=f.filter(d=>d["Code court de la prestation"]===p);if(i)f=f.filter(d=>d["Catégorie d'imposition OD 2026"]==i);if(s)f=f.filter(d=>(d["Nom bénéficiaire"]+' '+d["Prénom bénéficiaire"]).toLowerCase().includes(s));filteredDos=f;renderDos(f)}
+['flt-cat','flt-prest','flt-imp'].forEach(id=>document.getElementById(id).onchange=filterDos);
+document.getElementById('src-dos').oninput=filterDos;
+renderDos(dos);
+document.querySelectorAll('#tbl-dos th[data-col]').forEach(th=>{th.onclick=()=>{const col=th.dataset.col,type=th.dataset.type;document.querySelectorAll('#tbl-dos th').forEach(t=>t.classList.remove('sort-asc','sort-desc'));const dir=th.classList.contains('sort-asc')?'desc':'asc';th.classList.add('sort-'+dir);const colMap={num:"Numéro du dossier",nom:d=>d["Nom bénéficiaire"]+' '+d["Prénom bénéficiaire"],cat:"Catégorie",prest:"Code court de la prestation",imp:"Catégorie d'imposition OD 2026",date:"Date de début",od:"Part OD",cse:"Part CSE",tot:"Montant total",pts:"Points imputés au dossier"};filteredDos.sort((a,b)=>{let vA=typeof colMap[col]==='function'?colMap[col](a):a[colMap[col]];let vB=typeof colMap[col]==='function'?colMap[col](b):b[colMap[col]];if(type==='num'){vA=parseFloat(vA)||0;vB=parseFloat(vB)||0;return dir==='asc'?vA-vB:vB-vA}return dir==='asc'?String(vA||'').localeCompare(String(vB||'')):String(vB||'').localeCompare(String(vA||''))});renderDos(filteredDos)}});
+
+const totEcart=ctrlData.reduce((s,d)=>s+Math.abs(d.ecart),0);
+document.getElementById('k-ecart').textContent=ctrlData.length;
+document.getElementById('k-ecart-tot').textContent=fmt(totEcart);
+document.getElementById('k-conf').textContent=dos.length-ctrlData.length;
+function renderCtrl(d){document.querySelector('#tbl-ctrl tbody').innerHTML=d.length?d.map(x=>'<tr><td>'+x.num+'</td><td><strong>'+x.nom+'</strong></td><td><span class="badge badge-blue">'+x.prest+'</span></td><td class="num">'+fmt(x.imp)+'</td><td class="num">'+fmt(x.ctrl)+'</td><td class="num '+(x.ecart>0?'positive':'negative')+'">'+(x.ecart>0?'+':'')+fmt(x.ecart)+'</td><td><span class="badge '+(x.ecart>0?'badge-emerald':'badge-rose')+'">'+x.statut+'</span></td></tr>').join(''):'<tr><td colspan="7" style="text-align:center;color:var(--muted)">Aucun écart</td></tr>'}
+ctrlData.sort((a,b)=>Math.abs(b.ecart)-Math.abs(a.ecart));
+renderCtrl(ctrlData);
+document.querySelectorAll('#tbl-ctrl th[data-col]').forEach(th=>th.onclick=()=>sortTbl('tbl-ctrl',ctrlData,th.dataset.col,th.dataset.type,renderCtrl));
+}
+</script>
+</body>
+</html>
